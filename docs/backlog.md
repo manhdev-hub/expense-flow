@@ -19,8 +19,8 @@
 - Dependency: Khong co.
 - Automated tests: Workspace resolution, package names va runtime constraint checks.
 - Manual acceptance check: Review workspace policy.
-- Deliverable/evidence: Root manifests, `.nvmrc` va check output.
-- Trang thai: `TODO`
+- Deliverable/evidence: Root manifests, `.nvmrc`, `pnpm-workspace.yaml`, workspace discovery output voi `pnpm 11.20.0`, Node `24.18.0` va manual review da duoc user xac nhan.
+- Trang thai: `DONE`
 
 ### EF-002 - Shared package foundation
 
