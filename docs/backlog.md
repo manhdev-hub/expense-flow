@@ -53,7 +53,7 @@
 - Automated tests: Provider/query client setup test.
 - Manual acceptance check: Kiem tra client/server boundary.
 - Deliverable/evidence: Provider/convention source va test output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-005 - Frontend test infrastructure
 
@@ -208,7 +208,7 @@
 
 - Muc tieu: Bao ve refresh/logout flows.
 - Pham vi: CSRF endpoint/token hash, Origin, CORS credentials, cookie attributes.
-- Acceptance criteria: CSRF endpoint dung refresh cookie va no-store; refresh/logout bat buoc cookie + `X-CSRF-Token` + Origin; refresh rotate hai token; production cookie Secure/HttpOnly/Lax/host-only/Path auth; CORS khong wildcard.
+- Acceptance criteria: CSRF endpoint dung refresh cookie va no-store; refresh/logout bat buoc cookie + `X-CSRF-Token` + Origin; refresh rotate hai token; development cookie Secure=false/HttpOnly/Lax; production cross-site cookie Secure=true/HttpOnly/SameSite=None/host-only/Path auth; CORS khong wildcard.
 - Dependency: EF-017.
 - Automated tests: CSRF/Origin/CORS/cookie/rotation tests.
 - Manual acceptance check: Valid flow thanh cong, thieu CSRF/Origin bi chan.
@@ -244,7 +244,7 @@
 - Muc tieu: Employee dua draft vao approval.
 - Pham vi: Submit action, manager snapshot, submittedAt, UI states.
 - Acceptance criteria: Chi owner Employee submit DRAFT; snapshot lay `User.managerId`; thieu manager `409 EMPLOYEE_MANAGER_REQUIRED`; transition/audit cung transaction; UI xu ly conflict.
-- Dependency: EF-019, EF-018.
+- Dependency: EF-018, EF-019, EF-020.
 - Automated tests: State/manager unit, API integration, submit component tests.
 - Manual acceptance check: Submit thanh cong, thieu manager va status da doi.
 - Deliverable/evidence: Submit API/UI, tests va atomic audit evidence.
@@ -403,9 +403,9 @@
 
 ### EF-035 - Provision production PostgreSQL
 
-- Muc tieu: Provision Render PostgreSQL private.
-- Pham vi: Resource, network/access va secret wiring.
-- Acceptance criteria: Database khong public; chi API access; connection string khong commit.
+- Muc tieu: Provision Render PostgreSQL private database va wire secret.
+- Pham vi: Resource, network/access va GitHub Environment secrets wiring.
+- Acceptance criteria: Database khong public; chi API access; `PRODUCTION_DATABASE_URL` duoc luu trong GitHub Environment secret; connection string khong commit.
 - Dependency: EF-034.
 - Automated tests: Provider/config validation neu co.
 - Manual acceptance check: Review network, masking va access.
@@ -414,9 +414,9 @@
 
 ### EF-036 - Production migration gate
 
-- Muc tieu: Migration production mot lan truoc traffic/deploy.
-- Pham vi: Paid Render pre-deploy hoac free GitHub migration, secret, concurrency, deployment trigger.
-- Acceptance criteria: Paid command `pnpm --filter @expense-flow/api db:migrate:deploy`; free chay sau test/build truoc trigger Render; `PRODUCTION_DATABASE_URL` la environment secret; concurrency; failure khong trigger deploy; khong startup migration; seed rieng.
+- Muc tieu: Migration production mot lan qua GitHub Actions truoc khi trigger deployment.
+- Pham vi: Primary free/portfolio migration track qua GitHub Actions, secret wiring, concurrency, deployment trigger gate, alternative paid note.
+- Acceptance criteria: Primary track chay `pnpm --filter @expense-flow/api db:migrate:deploy` tren GitHub Actions sau khi test pass va truoc khi trigger deploy Render/Vercel; `PRODUCTION_DATABASE_URL` la environment secret; concurrency control; migration failure la STOP gate, ngung ngay khong trigger deploy; khong startup migration; seed rieng; Paid Render pre-deploy command duoc ghi chu duoi dang alternative note.
 - Dependency: EF-035.
 - Automated tests: Migration success/failure, concurrency va deploy gate tests.
 - Manual acceptance check: Review secret scope va failure gate.
@@ -425,9 +425,9 @@
 
 ### EF-037 - Deploy API va frontend
 
-- Muc tieu: Deploy Express Render Web Service va Next.js Vercel.
-- Pham vi: Separate services, build/start commands, environment variables.
-- Acceptance criteria: Deploy doc lap; frontend/API targets dung domain khi san sang; frontend khong expose DB.
+- Muc tieu: Deploy Express Render Web Service va Next.js Vercel chi khi migration gate da pass.
+- Pham vi: Separate services, build/start commands, environment variables, disable auto-deploy on git push.
+- Acceptance criteria: Kich hoat deploy Render va Vercel tu dong tu GitHub Actions qua API/Webhook trigger CHI KHI EF-036 migration gate pass 100%; auto-deploy tren Git push o Render va Vercel phai duoc tat (hoac chuyen sang manual/API trigger) de khong bao gio deploy song song hoac truoc migration; frontend khong expose DB credentials.
 - Dependency: EF-036.
 - Automated tests: Provider build/deploy va health checks.
 - Manual acceptance check: Mo frontend production va goi health HTTPS.
@@ -437,7 +437,7 @@
 ### EF-038 - Production security va smoke verification
 
 - Muc tieu: Xac minh production config va flow chinh.
-- Pham vi: Cookie/CORS/CSRF/HTTPS/origin, migration once, smoke flow, secret exposure.
+- Pham vi: Cookie (SameSite=None, Secure, HttpOnly)/CORS/CSRF/HTTPS/origin, migration once, smoke flow, secret exposure.
 - Acceptance criteria: Config dung architecture; migration truoc traffic; smoke login, draft, submit, approve/reject, reopen, history, list/dashboard; khong lo secret trong response/log/bundle/repo.
 - Dependency: EF-036, EF-037.
 - Automated tests: Production smoke/regression checks.
@@ -485,7 +485,7 @@
 - Muc tieu: Chot deployed, verified, portfolio-ready release.
 - Pham vi: Full regression, docs consistency, release/tag, CV-ready description.
 - Acceptance criteria: Lint/typecheck/build/unit/integration/E2E pass; production smoke pass; docs links pass; release/tag tao; co mo ta CV; khong secrets.
-- Dependency: EF-033, EF-034, EF-038, EF-040, EF-041.
+- Dependency: EF-034, EF-038, EF-039, EF-040, EF-041.
 - Automated tests: Full regression va release validation.
 - Manual acceptance check: Review deployed project, README, screenshots va tag.
 - Deliverable/evidence: Final CI report, release/tag, portfolio checklist va CV text.
@@ -503,8 +503,8 @@
 8. General list/filter/pagination/dashboard: EF-028 -> EF-029 -> EF-030.
 9. Frontend hardening/accessibility: EF-031 -> EF-032.
 10. Playwright: EF-033.
-11. Full CI/migration gate: EF-034 -> EF-035.
-12. Deployment/production verification: EF-036 -> EF-037 -> EF-038 -> EF-039.
+11. Full CI: EF-034.
+12. Production migration va deployment: EF-035 -> EF-036 -> EF-037 -> EF-038 -> EF-039.
 13. Portfolio completion/release: EF-040 -> EF-041 -> EF-042.
 
 ## Consistency checklist

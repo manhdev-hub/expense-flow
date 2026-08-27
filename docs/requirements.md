@@ -115,7 +115,7 @@ Tat ca system timestamp luu UTC. `expenseDate` khong mang timezone va duoc seria
 - Employee khong co manager khong submit/resubmit.
 - Backend tra `409 EMPLOYEE_MANAGER_REQUIRED`.
 - MVP khong hard-delete User.
-- Khong vo hieu hoa Manager khi con expense `PENDING` gan cho ho; phai reassign hoac xu ly expense truoc.
+- Khong vo hieu hoa Manager khi con expense `PENDING` gan cho ho. Trong MVP khong co reassign pending expense; cac expense do phai duoc assigned Manager hien tai xu ly truoc khi Manager co the bi vo hieu hoa.
 
 ### 6.6 Audit history
 
@@ -192,8 +192,7 @@ Vi du khi E doi tu M1 sang M2 trong luc X `PENDING` va assign cho M1: general ag
 - Frontend Next.js; Express API chay rieng; TypeScript; PostgreSQL; Prisma.
 - Monorepo dung pnpm workspaces, khong dung Turborepo trong MVP.
 - Node.js 24.x LTS, pnpm 11.x; exact package manager `pnpm@11.20.0`.
-- Frontend du kien Vercel, API Render Web Service, database Render PostgreSQL; database khong public.
-- Production target: `https://expenseflow.example.com` va `https://api.expenseflow.example.com`; domain that chua can trong development.
+- Primary production topology: Frontend `https://<project>.vercel.app` (Vercel), API `https://<service>.onrender.com` (Render Web Service), Database Render PostgreSQL (private). Cross-site topology. Custom domains (`https://expenseflow.example.com`, `https://api.expenseflow.example.com`) chi la optional/future custom-domain topology, khong phai Primary Execution Track hien tai.
 - Password dai 12-128 ky tu, hash Argon2id, khong bat buoc composition rules.
 - Demo credentials lay tu environment variables; seed idempotent, chi chay explicit va khong tu chay production.
 - Access token song 15 phut trong frontend memory; refresh token HttpOnly cookie; logout revoke session hien tai.

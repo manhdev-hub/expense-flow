@@ -45,16 +45,18 @@ Root scripts du kien: `dev`, `dev:web`, `dev:api`, `build`, `lint`, `typecheck`,
 
 ## 3. Deployment topology
 
-- Next.js du kien deploy tren Vercel.
-- Express API du kien deploy duoi dang Render Web Service.
-- PostgreSQL du kien dung Render PostgreSQL.
-- Frontend, API va database la cac component rieng.
-- Database khong public va chi cho API truy cap.
-- Production target:
+- Primary Production Topology:
+  - Frontend: `https://<project>.vercel.app` (Vercel default deployment domain)
+  - API: `https://<service>.onrender.com` (Render Web Service default deployment domain)
+  - Database: Render PostgreSQL (private database, không public)
+  - Frontend Vercel và API Render sử dụng default deployment domains tạo thành cross-site topology.
+- Optional/future custom-domain topology:
   - `https://expenseflow.example.com`
   - `https://api.expenseflow.example.com`
-- Domain that chua can trong giai doan development.
-- Production bat buoc HTTPS.
+  - Được ghi nhận dưới dạng tùy chọn mở rộng tương lai, không phải Primary Execution Track hiện tại.
+- Frontend, API và database là các component riêng.
+- Database không public và chỉ cho API truy cập.
+- Production bắt buộc HTTPS.
 
 ## 4. Backend layers
 
@@ -98,7 +100,7 @@ Business rules:
 - Employee khong co Manager van dang nhap, tao/xem/sua/xoa DRAFT; submit/resubmit bi chan voi `409 EMPLOYEE_MANAGER_REQUIRED`.
 - Manager co the co `managerId` null.
 - MVP khong hard-delete User.
-- Khong vo hieu hoa Manager khi con `PENDING` expense gan cho manager do; phai reassign hoac xu ly truoc.
+- Khong vo hieu hoa Manager khi con `PENDING` expense gan cho manager do. Trong MVP khong co reassign pending expense; cac expense do phai duoc assigned Manager hien tai xu ly truoc khi Manager co the bi vo hieu hoa.
 
 ### Expense
 
@@ -169,16 +171,24 @@ Indexes can thiet cho owner/status/date, assigned manager/status/date, session u
 
 ### Cookie va origin
 
-Production refresh cookie:
+Local Development refresh cookie (`http://localhost:3000` <-> `http://localhost:4000`):
+
+- `HttpOnly=true`
+- `Secure=false`
+- `SameSite=Lax`
+- host-only, khong set Domain
+- `Path=/api/v1/auth`
+
+Production refresh cookie (cross-site Vercel `*.vercel.app` frontend <-> Render `*.onrender.com` API):
 
 - `HttpOnly=true`
 - `Secure=true`
-- `SameSite=Lax`
+- `SameSite=None`
 - host-only, khong set Domain
 - `Path=/api/v1/auth`
 - expiry phu hop voi refresh session
 
-CORS chi cho configured frontend origins, `credentials=true`, khong dung wildcard origin. Refresh/logout phai kiem tra Origin hop le va CSRF header. Production dung HTTPS.
+CORS chi cho configured frontend origins (danh sach nghem ngat, khong dung wildcard origin), `credentials=true`. Refresh/logout phai kiem tra `Origin` hop le va header `X-CSRF-Token`. Production bat buoc HTTPS.
 
 ### CSRF flow
 
@@ -214,13 +224,25 @@ Local co hai database:
 
 Integration test chi dung `TEST_DATABASE_URL`, apply migrations va reset test data co kiem soat. Migration tao/review trong development va commit vao repository. Test va production dung `prisma migrate deploy`; production khong dung `prisma migrate dev`. API startup khong chay migration.
 
-Paid Render service dung pre-deploy command:
+### Primary Execution Track (Free/Low-cost Portfolio)
+
+Production deployment tu dong chay qua GitHub Actions theo chuoi tuan tu nghem ngat:
+
+1. `Full CI` (`EF-034`): Lint, typecheck, unit/integration test pass.
+2. `Production Migration Gate` (`EF-036`): GitHub Actions thuc thi `pnpm --filter @expense-flow/api db:migrate:deploy` vao `PRODUCTION_DATABASE_URL` (duoc bao mat trong GitHub Environment secrets).
+3. `Production Deployment` (`EF-037`): Chi khi migration gate thanh cong, GitHub Actions moi kich hoat deploy Render (API Web Service) va Vercel (Frontend Web App) qua API/Webhook trigger.
+4. Auto-deploy tren Git push o Render va Vercel phai duoc tat (chuyen sang manual/API trigger) de dam bao deployment khong chay song song hoac truoc khi migration gate pass.
+5. Neu Full CI hoac migration gate thất bại, quy trình STOP ngay va khong trigger deployment.
+
+### Alternative Track Note (Paid Render Service)
+
+Doi voi moi truong Render paid service, co the dung pre-deploy command noi bo cua Render:
 
 ```text
 pnpm --filter @expense-flow/api db:migrate:deploy
 ```
 
-Free portfolio deployment dung GitHub Actions chay migration dung mot lan sau test/build va truoc khi trigger Render deploy. `PRODUCTION_DATABASE_URL` nam trong GitHub environment secret. Migration job co concurrency control. Neu migration that bai, deployment dung lai va khong trigger Render deploy. Demo seed la thao tac rieng, khong chay cung migration.
+Đây chỉ là phương án dự phòng/ghi chú tham khảo, không phải primary execution path của dự án.
 
 ## 10. Testing strategy
 

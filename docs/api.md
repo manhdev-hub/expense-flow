@@ -289,8 +289,9 @@ Out-of-scope resource access dung `404` theo error convention de khong lam lo re
 
 - Login kiem tra Origin hop le va rate limit.
 - Refresh/logout bat buoc refresh-token cookie, `X-CSRF-Token` va Origin hop le.
-- CORS chi cho phep configured frontend origins, `credentials=true`, khong wildcard.
-- Production cookie: Secure, HttpOnly, SameSite=Lax, host-only, Path `/api/v1/auth`.
+- CORS chi cho phep configured frontend origins, `credentials=true`, khong wildcard origin.
+- Development cookie: `Secure=false`, `HttpOnly=true`, `SameSite=Lax`, host-only, Path `/api/v1/auth`.
+- Production cookie (cross-site Vercel <-> Render): `Secure=true`, `HttpOnly=true`, `SameSite=None`, host-only, Path `/api/v1/auth`.
 - Production bat buoc HTTPS.
 - Access token chi trong frontend memory, TTL 15 phut.
 - CSRF token chi trong frontend memory; csrf endpoint tra `Cache-Control: no-store`.
