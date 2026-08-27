@@ -42,7 +42,7 @@
 - Automated tests: Placeholder render test.
 - Manual acceptance check: Mo frontend va thay placeholder.
 - Deliverable/evidence: Web app, Tailwind config, screenshot/local URL.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-004 - Frontend form va server-state conventions
 
