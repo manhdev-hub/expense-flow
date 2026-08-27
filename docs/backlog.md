@@ -75,7 +75,7 @@
 - Automated tests: Import app, middleware va request parsing tests.
 - Manual acceptance check: Start server va kiem tra app test doc lap.
 - Deliverable/evidence: App/server source va tests.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-007 - Backend configuration va logging
 
