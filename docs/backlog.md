@@ -31,7 +31,7 @@
 - Automated tests: Shared typecheck va sample unit test.
 - Manual acceptance check: Kiem tra khong co dependency nguoc.
 - Deliverable/evidence: Shared source, manifest va test output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-003 - Next.js frontend foundation
 
