@@ -14,8 +14,8 @@
 ### EF-001 - Workspace va runtime
 
 - Muc tieu: Tao monorepo TypeScript voi pnpm va runtime policy.
-- Pham vi: pnpm workspaces, Node 24.x LTS, pnpm 10.x, `.nvmrc`, engines, exact packageManager va package names.
-- Acceptance criteria: Khong Turborepo; package `@expense-flow/web`, `@expense-flow/api`, `@expense-flow/shared`; `.nvmrc` la `24`; engines Node `>=24 <25`, pnpm `>=10 <11`; exact pnpm packageManager lay tu lenh thuc te.
+- Pham vi: pnpm workspaces, Node 24.x LTS, pnpm 11.x, `.nvmrc`, engines, exact packageManager va package names.
+- Acceptance criteria: Khong Turborepo; package `@expense-flow/web`, `@expense-flow/api`, `@expense-flow/shared`; `.nvmrc` la `24`; engines Node `>=24 <25`, pnpm `>=11 <12`; `packageManager` la `pnpm@11.20.0`.
 - Dependency: Khong co.
 - Automated tests: Workspace resolution, package names va runtime constraint checks.
 - Manual acceptance check: Review workspace policy.

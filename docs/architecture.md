@@ -9,10 +9,10 @@ MVP khong dung Turborepo.
 ## 2. Runtime va repository
 
 - Node.js `24.x LTS`.
-- pnpm `10.x`.
+- pnpm `11.x`.
 - `.nvmrc` chua `24`.
-- Root `package.json` engines: Node `>=24 <25`, pnpm `>=10 <11`.
-- `packageManager` phai ghi exact pnpm version doc tu lenh thuc te luc khoi tao; khong tu doan patch version.
+- Root `package.json` phai dung `packageManager: "pnpm@11.20.0"`.
+- Root `package.json` engines: Node `>=24 <25`, pnpm `>=11 <12`.
 - Package names:
   - `@expense-flow/web`
   - `@expense-flow/api`

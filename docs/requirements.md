@@ -191,7 +191,7 @@ Vi du khi E doi tu M1 sang M2 trong luc X `PENDING` va assign cho M1: general ag
 
 - Frontend Next.js; Express API chay rieng; TypeScript; PostgreSQL; Prisma.
 - Monorepo dung pnpm workspaces, khong dung Turborepo trong MVP.
-- Node.js 24.x LTS, pnpm 10.x.
+- Node.js 24.x LTS, pnpm 11.x; exact package manager `pnpm@11.20.0`.
 - Frontend du kien Vercel, API Render Web Service, database Render PostgreSQL; database khong public.
 - Production target: `https://expenseflow.example.com` va `https://api.expenseflow.example.com`; domain that chua can trong development.
 - Password dai 12-128 ky tu, hash Argon2id, khong bat buoc composition rules.
