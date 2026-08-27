@@ -66,10 +66,12 @@ Khong co public registration, password change, forgot password hoac reset passwo
 
 ### GET `/api/v1/expenses`
 
-Tra danh sach theo authorization scope:
+Day la general expense list va tra danh sach theo operation policy:
 
 - Employee: expense co `ownerId` la user hien tai.
-- Manager: expense cua direct reports va theo scope xu ly cua manager.
+- Manager: expense cua Employee co `User.managerId` bang id cua Manager hien tai.
+
+General list khong dong nghia Manager co quyen approve/reject moi expense trong list. Queue phe duyet duoc gioi han boi `assignedManagerId` o endpoint/operation rieng.
 
 Query params MVP:
 
@@ -79,6 +81,12 @@ Query params MVP:
 - `category`: filter theo category.
 - `fromDate`, `toDate`: filter theo `expenseDate`.
 - Sort chi dung cac field duoc backend cho phep.
+
+### GET `/api/v1/expenses/pending-approval`
+
+Tra pending approval queue rieng cho Manager. Ket qua chi gom expense co status `PENDING` va `Expense.assignedManagerId` bang id cua Manager dang dang nhap. Endpoint nay khong dung `User.managerId`; Manager hien tai cua Employee khong thay the assigned manager trong approval workflow.
+
+Employee khong co pending approval queue. Manager khong phu hop khong duoc nhin thay resource ngoai scope.
 
 Response:
 
@@ -115,10 +123,13 @@ Employee tao expense `DRAFT`. Backend gan owner tu access token; client khong tu
 
 ### GET `/api/v1/expenses/:expenseId`
 
-Tra detail neu user co scope:
+Tra detail neu user thoa mot trong cac dieu kien:
 
 - Employee la owner.
-- Manager la assigned manager phu hop voi operation/scope MVP.
+- Manager la current manager cua Employee owner, tuc `User.managerId` bang id Manager.
+- Manager la assigned manager cua expense, tuc `Expense.assignedManagerId` bang id Manager.
+
+Quyen xem detail khong tu dong cap quyen approve/reject.
 
 ### PATCH `/api/v1/expenses/:expenseId`
 
@@ -146,11 +157,11 @@ Thanh cong chuyen `DRAFT -> PENDING`, snapshot manager hien tai vao `assignedMan
 
 ### POST `/api/v1/expenses/:expenseId/approve`
 
-Chi assigned manager duoc approve `PENDING` expense cua direct report. Manager khong duoc approve expense cua chinh minh. Request khong cho sua metadata. Chuyen `PENDING -> APPROVED`.
+Chi Manager co id bang `Expense.assignedManagerId` duoc approve expense `PENDING` cua Employee. Manager hien tai cua Employee nhung khac assigned manager khong duoc approve. Manager khong duoc approve expense cua chinh minh. Request khong cho sua metadata. Chuyen `PENDING -> APPROVED`.
 
 ### POST `/api/v1/expenses/:expenseId/reject`
 
-Chi assigned manager duoc reject `PENDING` expense. Request bat buoc reason khong rong. Chuyen `PENDING -> REJECTED`; reason duoc luu trong audit event.
+Chi Manager co id bang `Expense.assignedManagerId` duoc reject expense `PENDING`. Manager hien tai cua Employee nhung khac assigned manager khong duoc reject. Request bat buoc reason khong rong. Chuyen `PENDING -> REJECTED`; reason duoc luu trong audit event.
 
 ```json
 {
@@ -168,7 +179,11 @@ Audit visibility:
 
 - Employee chi xem history expense do minh so huu.
 - Manager chi xem history neu `expense.assignedManagerId` bang id cua manager.
-- Manager moi khong tu dong xem history cua expense dang gan manager cu.
+- Current Manager chi xem history neu `Expense.assignedManagerId` bang ID cua minh; neu khong phai assigned manager thi khong co audit access.
+
+Current manager cua Employee khong duoc xem history neu khong phai `assignedManagerId`. Vi du khi E doi tu M1 sang M2 trong luc X `PENDING`, M2 co the xem X trong general list va detail, nhung khong xem history; M1 tiep tuc xem history.
+
+Audit visibility dung assignment hien tai: sau khi M1 reject, owner reopen va xoa `assignedManagerId`, khong Manager nao xem history; sau khi owner resubmit gan M2, M2 xem duoc toan bo history cua X, ke ca history cycle truoc; owner Employee luon xem duoc.
 
 Response allowlist:
 
@@ -197,13 +212,22 @@ Khong tra token, token hash, password, secret hoac metadata noi bo. Khong co end
 
 ### GET `/api/v1/dashboard`
 
-Dung du lieu thang hien tai, khong nhan custom time range. Backend tinh theo authorization scope.
+Dung du lieu thang hien tai, khong nhan custom time range. Scope dashboard:
+
+- Employee: chi expense do minh so huu.
+- Manager: expense cua Employee hien dang la direct report cua minh, dua tren `User.managerId`.
+
+Dashboard khong dung `assignedManagerId` de thay doi general manager scope.
 
 Response gom:
 
 - So luong va tong tien theo status.
 - Tong tien theo category.
-- So expense `PENDING` manager dang cho xu ly.
+- `pendingApprovalCount`: so expense `PENDING` co `assignedManagerId` bang id Manager dang dang nhap.
+
+General aggregates cua Manager chi tinh tren expense cua Employee hien dang la direct report theo `User.managerId`. `pendingApprovalCount` khong dung `User.managerId`; no chi dung `status = PENDING` va `assignedManagerId` cua Manager hien tai.
+
+Vi du E doi tu M1 sang M2 khi X `PENDING` va assign cho M1: general aggregates cua M2 co the gom X, M1 khong con gom X; `pendingApprovalCount` cua M1 van gom X va cua M2 khong gom X.
 
 Tat ca tong tien la integer VND.
 
@@ -248,6 +272,18 @@ Status mapping du kien:
 | `500` | Loi server khong mong doi.                                                                    |
 
 Reject thieu reason va expenseDate nam trong tuong lai la validation error. Transition canh tranh hoac status khong con phu hop la `409`.
+
+## 7.1 Authorization scenarios
+
+| Actor va truong hop            | General list                                                          | Pending queue                          | Detail           | Approve/reject                         | Audit history                          |
+| ------------------------------ | --------------------------------------------------------------------- | -------------------------------------- | ---------------- | -------------------------------------- | -------------------------------------- |
+| Employee owner                 | Expense cua minh                                                      | Khong phai queue Manager               | Duoc xem         | Khong duoc                             | Duoc xem                               |
+| Manager hien tai cua Employee  | Thay expense Employee dang la direct report                           | Chi thay neu assignedManagerId la minh | Duoc xem         | Chi duoc neu assignedManagerId la minh | Chi duoc neu assignedManagerId la minh |
+| Assigned Manager cu            | Khong thay trong general list neu khong con current manager           | Thay neu `PENDING`                     | Duoc xem         | Duoc neu `PENDING`                     | Duoc xem                               |
+| Manager khong lien quan        | Khong thay                                                            | Khong thay                             | Khong duoc xem   | Khong duoc                             | Khong duoc                             |
+| E doi M1 -> M2 khi X `PENDING` | M2 thay X; M1 khong thay qua general list neu khong con direct report | M1 thay X; M2 khong thay               | M1 va M2 deu xem | Chi M1 duoc                            | Chi M1 duoc                            |
+
+Out-of-scope resource access dung `404` theo error convention de khong lam lo resource. `403` chi dung cho authenticated request bi tu choi boi role/origin/policy khi resource existence khong phai thong tin can bao ve.
 
 ## 7. Auth security contract
 

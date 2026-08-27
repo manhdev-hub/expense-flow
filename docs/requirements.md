@@ -9,7 +9,8 @@ ExpenseFlow la he thong noi bo de nhan vien tao va theo doi chi phi, dong thoi h
 - Hai role: `EMPLOYEE` va `MANAGER`.
 - Employee tao, sua va xoa expense o trang thai `DRAFT`.
 - Employee submit expense de phe duyet.
-- Manager phu trach approve hoac reject expense cua direct reports.
+- Manager xem danh sach tong quat expense cua cac Employee hien dang la direct reports cua minh.
+- Manager chi approve hoac reject expense duoc gan cho minh trong approval snapshot.
 - Reject bat buoc co ly do.
 - Owner reopen expense bi reject.
 - Luu lich su submit, approve, reject va reopen theo audit event append-only.
@@ -48,11 +49,13 @@ ExpenseFlow la he thong noi bo de nhan vien tao va theo doi chi phi, dong thoi h
 
 ### MANAGER
 
-- Chi xem va xu ly expense cua direct reports.
-- Chi approve/reject expense khi `assignedManagerId` bang id cua minh.
+- General expense list chi gom expense cua Employee co `User.managerId` bang id cua Manager dang dang nhap.
+- Pending approval queue chi gom expense co status `PENDING` va `Expense.assignedManagerId` bang id cua Manager dang dang nhap.
+- Expense detail duoc xem neu Manager la current manager cua Employee owner, hoac Manager la `assignedManagerId` cua expense.
+- Approve/reject chi duoc thuc hien khi `Expense.assignedManagerId` bang id cua Manager dang dang nhap va expense o `PENDING`.
 - Khong duoc tu approve expense cua chinh minh.
 - Khong duoc approve/reject expense khong phai employee expense trong MVP.
-- Manager moi khong tu dong thay expense dang duoc gan cho manager cu.
+- Khi Employee doi Manager, Manager moi chi xem expense trong general list neu Employee la direct report hien tai va chi xem detail theo detail policy; Manager moi khong co pending queue, approve/reject hoac audit access neu khong phai `assignedManagerId`.
 
 ## 5. Expense fields va validation
 
@@ -92,7 +95,7 @@ Tat ca system timestamp luu UTC. `expenseDate` khong mang timezone va duoc seria
 
 ### 6.3 Approve/reject
 
-1. Manager xem expense `PENDING` cua direct reports duoc gan cho minh.
+1. Manager xem pending approval queue gom expense `PENDING` co `assignedManagerId` bang id cua minh.
 2. Manager approve de chuyen `PENDING -> APPROVED`, hoac reject de chuyen `PENDING -> REJECTED`.
 3. Reject phai co reason.
 4. Manager khong thay doi metadata expense trong thao tac approve/reject.
@@ -121,14 +124,28 @@ Tat ca system timestamp luu UTC. `expenseDate` khong mang timezone va duoc seria
 - Audit response chi co allowlist: `id`, `eventType`, actor `id`/`name`, `fromStatus`, `toStatus`, `reason`, `createdAt`.
 - Khong tra token, token hash, password, secret hoac metadata noi bo.
 
+Audit visibility cua Manager luon danh gia theo `Expense.assignedManagerId` hien tai, khong theo actor cua tung AuditEvent. Khi expense `PENDING` gan M1, M1 xem duoc toan bo history. Sau khi M1 reject, owner reopen va xoa assignment, khong Manager nao xem duoc history. Khi owner resubmit gan M2, M2 xem duoc toan bo history cua expense, ke ca cycle truoc; owner Employee luon xem duoc.
+
+### 6.7 Manager scope khi thay doi quan he
+
+Quan he quan ly hien tai va nguoi chiu trach nhiem approval la hai khai niem doc lap:
+
+- `User.managerId` xac dinh Employee dang la direct report cua Manager nao hien tai.
+- `Expense.assignedManagerId` la snapshot cua Manager chiu trach nhiem tai thoi diem submit.
+- General expense list dung `User.managerId`.
+- Pending approval queue, approve/reject va audit history dung `Expense.assignedManagerId`.
+- Expense detail cho phep current Manager hoac assigned Manager xem, nhung quyen xem detail khong tu dong cap quyen approve/reject.
+- Khi Employee E submit X cho M1, sau do `E.managerId` doi sang M2: M1 van thay X trong queue, xem detail, xem audit va approve/reject; M2 thay X trong general list va duoc xem detail nhung khong approve/reject va khong xem audit; X khong tu dong duoc chuyen sang M2.
+- Reassign pending expense nam ngoai MVP.
+
 ## 7. State transition va business rules
 
-| Tu         | Den        | Actor            | Dieu kien                                                      |
-| ---------- | ---------- | ---------------- | -------------------------------------------------------------- |
-| `DRAFT`    | `PENDING`  | Owner Employee   | Employee co manager hien tai. Gan assigned manager snapshot.   |
-| `PENDING`  | `APPROVED` | Assigned Manager | Expense la cua direct report va manager khong tu approve minh. |
-| `PENDING`  | `REJECTED` | Assigned Manager | Reason bat buoc.                                               |
-| `REJECTED` | `DRAFT`    | Owner Employee   | Xoa `assignedManagerId`.                                       |
+| Tu         | Den        | Actor            | Dieu kien                                                                                     |
+| ---------- | ---------- | ---------------- | --------------------------------------------------------------------------------------------- |
+| `DRAFT`    | `PENDING`  | Owner Employee   | Employee co manager hien tai. Gan assigned manager snapshot.                                  |
+| `PENDING`  | `APPROVED` | Assigned Manager | Actor la Manager, owner la Employee, `assignedManagerId` bang actor va khong tu approve minh. |
+| `PENDING`  | `REJECTED` | Assigned Manager | Actor la Manager, owner la Employee, `assignedManagerId` bang actor va reason bat buoc.       |
+| `REJECTED` | `DRAFT`    | Owner Employee   | Xoa `assignedManagerId`.                                                                      |
 
 `APPROVED` la trang thai ket thuc trong MVP. Transition khong hop le, status da thay doi hoac transition canh tranh tra `409`. Khong co general idempotency key trong MVP.
 
@@ -142,7 +159,12 @@ Dashboard dung thang hien tai, khong co time-range tuy chinh:
 - Tong tien theo category.
 - So expense `PENDING` manager dang cho xu ly.
 
-Backend tinh dashboard theo authorization scope cua user.
+Dashboard tach hai scope:
+
+- General aggregates (count va total theo status, total theo category): Employee chi tren expense do minh so huu; Manager tren expense cua Employee hien dang la direct report cua minh theo `User.managerId`.
+- `pendingApprovalCount`: chi dem expense co status `PENDING` va `assignedManagerId` bang id Manager dang dang nhap; khong dung `User.managerId`.
+
+Vi du khi E doi tu M1 sang M2 trong luc X `PENDING` va assign cho M1: general aggregates cua M2 co the gom X, general aggregates cua M1 khong con gom X; `pendingApprovalCount` cua M1 van gom X, cua M2 khong gom X.
 
 ## 9. Tieu chi nghiem thu tong quat
 
@@ -155,6 +177,15 @@ Backend tinh dashboard theo authorization scope cua user.
 - Audit duoc tao cung transaction voi transition va khong bi sua/xoa qua API.
 - Khong co public registration va khong co API/UI password change trong MVP.
 - Access token va CSRF token khong duoc luu trong localStorage.
+
+### Acceptance criteria cho Manager scope
+
+- General manager list tra expense cua Employee co `User.managerId` la Manager hien tai.
+- Pending approval queue chi tra expense `PENDING` co `Expense.assignedManagerId` la Manager dang dang nhap.
+- Manager chi approve/reject expense khi la `assignedManagerId`; current manager khong thay the assigned manager.
+- Manager duoc xem detail neu la current manager cua Employee owner hoac assigned manager cua expense.
+- Audit history chi tra cho Employee owner hoac assigned manager.
+- Khi E doi tu M1 sang M2 trong luc X `PENDING`, M1 van xu ly X; M2 thay X trong general list va detail nhung khong xu ly hoac xem audit; khong co auto-reassign.
 
 ## 10. Assumptions da chot
 

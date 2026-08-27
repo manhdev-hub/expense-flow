@@ -60,12 +60,27 @@ Root scripts du kien: `dev`, `dev:web`, `dev:api`, `build`, `lint`, `typecheck`,
 
 1. HTTP/router: parse request, request id, cookie/CORS/Origin checks va map response.
 2. Authentication middleware: validate access token hoac refresh session.
-3. Authorization policy: kiem tra role, owner va assigned manager scope.
+3. Authorization policy: kiem tra role va policy cua tung operation; khong dung mot dieu kien Manager scope chung.
 4. Application service: validate use case va goi state transition.
 5. State transition service: update theo status hien tai, tao audit trong transaction.
 6. Prisma data layer: truy cap PostgreSQL va enforce query scope.
 
 Frontend chi hien thi control dua tren session state de co UX tot; backend van bat buoc enforce moi quyen va transition.
+
+### Authorization policy theo operation
+
+| Operation                    | Policy                                                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| General manager expense list | Manager chi xem expense cua Employee co `User.managerId` bang id cua minh hien tai.                                                                                                              |
+| Expense detail               | Employee owner duoc xem; Manager duoc xem neu la current manager cua Employee owner hoac `Expense.assignedManagerId` bang id cua minh. Quyen xem detail khong cap quyen approve/reject.          |
+| Pending approval queue       | Chi expense co status `PENDING` va `Expense.assignedManagerId` bang id Manager hien tai.                                                                                                         |
+| Approve/reject               | Chi actor role Manager co id bang `Expense.assignedManagerId`, expense `PENDING` va owner role Employee; khong kiem tra `User.managerId`; Manager khong duoc tu approve/reject expense cua minh. |
+| Audit history                | Employee owner hoac Manager co id bang `Expense.assignedManagerId`. Current manager khong tu dong xem audit cua workflow cu.                                                                     |
+| Current-month dashboard      | General aggregates dung owner/current `User.managerId`; `pendingApprovalCount` chi dung `PENDING` + `assignedManagerId` cua Manager hien tai.                                                    |
+
+`User.managerId` la quan he quan ly hien tai. `Expense.assignedManagerId` la approval assignment snapshot tai thoi diem submit. Khi `User.managerId` thay doi, pending expense cu giu nguyen `assignedManagerId` va tiep tuc do Manager cu xu ly. Khong co reassign workflow hoac user-management UI/API trong MVP.
+
+Vi du E submit X cho M1, sau do E doi sang M2: M1 van co queue/detail/audit/approve/reject access; M2 co X trong general list va detail access nhung khong co queue/approve/reject/audit access. X khong tu dong chuyen assignment.
 
 ## 5. Data model de xuat
 
@@ -79,7 +94,8 @@ Frontend chi hien thi control dua tren session state de co UX tot; backend van b
 
 Business rules:
 
-- Employee bat buoc co `managerId` o business layer.
+- `managerId` nullable; Employee co the tam thoi khong co Manager.
+- Employee khong co Manager van dang nhap, tao/xem/sua/xoa DRAFT; submit/resubmit bi chan voi `409 EMPLOYEE_MANAGER_REQUIRED`.
 - Manager co the co `managerId` null.
 - MVP khong hard-delete User.
 - Khong vo hieu hoa Manager khi con `PENDING` expense gan cho manager do; phai reassign hoac xu ly truoc.
@@ -98,7 +114,7 @@ Business rules:
 - `submittedAt`: nullable
 - `createdAt`, `updatedAt`: UTC
 
-Khi submit, `assignedManagerId` lay manager hien tai cua employee. Thay doi `User.managerId` khong lam thay doi expense `PENDING`. Reopen tu `REJECTED` xoa assigned manager; submit lai tao snapshot moi.
+Khi submit, `assignedManagerId` lay manager hien tai cua employee. Thay doi `User.managerId` khong lam thay doi expense `PENDING` hoac quyen xu ly cua assigned manager cu. Reopen tu `REJECTED` xoa assigned manager; submit lai tao snapshot moi.
 
 ### RefreshSession
 
@@ -124,16 +140,18 @@ Moi login tao mot session. Mot user co the co nhieu session/device. Rotation tha
 
 Audit append-only, khong co API update/delete va luu vo thoi han trong MVP. Metadata noi bo khong duoc tra qua audit API va khong duoc chua password, token, token hash hoac secret.
 
+Audit visibility cua Manager chi danh gia theo `Expense.assignedManagerId` hien tai, khong theo Manager cua tung AuditEvent. Khi reopen xoa assignment, khong Manager nao xem history; khi resubmit gan Manager moi, Manager moi xem toan bo history cu. Khong them workflow-cycle model hoac assigned manager vao AuditEvent.
+
 Indexes can thiet cho owner/status/date, assigned manager/status/date, session user/revocation/expiry va audit expense/time.
 
 ## 6. State machine va transaction
 
-| Transition            | Authorization                      | Transaction effect                                         |
-| --------------------- | ---------------------------------- | ---------------------------------------------------------- |
-| `DRAFT -> PENDING`    | Owner Employee co manager hien tai | Gan assigned manager snapshot, set submittedAt, tao audit. |
-| `PENDING -> APPROVED` | Assigned Manager                   | Update status, tao audit.                                  |
-| `PENDING -> REJECTED` | Assigned Manager, reason bat buoc  | Update status, tao audit voi reason.                       |
-| `REJECTED -> DRAFT`   | Owner Employee                     | Xoa assigned manager, tao audit.                           |
+| Transition            | Authorization                                                           | Transaction effect                                                             |
+| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `DRAFT -> PENDING`    | Owner Employee co manager hien tai                                      | Gan assigned manager snapshot, set submittedAt, tao audit.                     |
+| `PENDING -> APPROVED` | Manager co id bang `assignedManagerId`, owner Employee                  | Update status, tao audit; khong can current direct-report relation.            |
+| `PENDING -> REJECTED` | Manager co id bang `assignedManagerId`, owner Employee, reason bat buoc | Update status, tao audit voi reason; khong can current direct-report relation. |
+| `REJECTED -> DRAFT`   | Owner Employee                                                          | Xoa assigned manager, tao audit.                                               |
 
 `APPROVED` terminal. Update phai co dieu kien status hien tai trong transaction; neu khong con match hoac co concurrent transition thi tra `409`. Khong dung general idempotency key trong MVP.
 
