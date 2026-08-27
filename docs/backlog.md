@@ -64,7 +64,7 @@
 - Automated tests: Vitest/RTL/jsdom smoke test.
 - Manual acceptance check: Review test output.
 - Deliverable/evidence: Config, smoke test va output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-006 - Express application foundation
 
