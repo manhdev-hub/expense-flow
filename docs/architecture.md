@@ -1,0 +1,233 @@
+# ExpenseFlow Architecture
+
+## 1. Overview
+
+ExpenseFlow la monorepo TypeScript dung pnpm workspaces. He thong gom Next.js frontend, Express API chay rieng va PostgreSQL. Prisma chi nam trong backend; chi backend duoc ket noi PostgreSQL. Frontend khong truy cap database truc tiep.
+
+MVP khong dung Turborepo.
+
+## 2. Runtime va repository
+
+- Node.js `24.x LTS`.
+- pnpm `10.x`.
+- `.nvmrc` chua `24`.
+- Root `package.json` engines: Node `>=24 <25`, pnpm `>=10 <11`.
+- `packageManager` phai ghi exact pnpm version doc tu lenh thuc te luc khoi tao; khong tu doan patch version.
+- Package names:
+  - `@expense-flow/web`
+  - `@expense-flow/api`
+  - `@expense-flow/shared`
+
+Layout du kien:
+
+```text
+expense-flow/
+  apps/
+    web/
+      app/
+      package.json
+    api/
+      src/
+      prisma/
+      package.json
+  packages/
+    shared/
+      src/
+      package.json
+  package.json
+  pnpm-workspace.yaml
+  .nvmrc
+```
+
+Root scripts du kien: `dev`, `dev:web`, `dev:api`, `build`, `lint`, `typecheck`, `test`, `test:integration`, `test:e2e`, `db:generate`, `db:migrate:dev`, `db:migrate:deploy`, `db:seed`. Chi tao script khi workspace/package tuong ung da ton tai.
+
+`@expense-flow/shared` chua type/schema contract dung chung, khong chua database access. API la boundary duy nhat cho authentication, authorization, business rules, state transition va database.
+
+## 3. Deployment topology
+
+- Next.js du kien deploy tren Vercel.
+- Express API du kien deploy duoi dang Render Web Service.
+- PostgreSQL du kien dung Render PostgreSQL.
+- Frontend, API va database la cac component rieng.
+- Database khong public va chi cho API truy cap.
+- Production target:
+  - `https://expenseflow.example.com`
+  - `https://api.expenseflow.example.com`
+- Domain that chua can trong giai doan development.
+- Production bat buoc HTTPS.
+
+## 4. Backend layers
+
+1. HTTP/router: parse request, request id, cookie/CORS/Origin checks va map response.
+2. Authentication middleware: validate access token hoac refresh session.
+3. Authorization policy: kiem tra role, owner va assigned manager scope.
+4. Application service: validate use case va goi state transition.
+5. State transition service: update theo status hien tai, tao audit trong transaction.
+6. Prisma data layer: truy cap PostgreSQL va enforce query scope.
+
+Frontend chi hien thi control dua tren session state de co UX tot; backend van bat buoc enforce moi quyen va transition.
+
+## 5. Data model de xuat
+
+### User
+
+- `id`
+- `role`: `EMPLOYEE` hoac `MANAGER`
+- `managerId`: nullable foreign key toi User
+- identity fields can thiet cho login/display
+- system timestamps UTC
+
+Business rules:
+
+- Employee bat buoc co `managerId` o business layer.
+- Manager co the co `managerId` null.
+- MVP khong hard-delete User.
+- Khong vo hieu hoa Manager khi con `PENDING` expense gan cho manager do; phai reassign hoac xu ly truoc.
+
+### Expense
+
+- `id`
+- `ownerId`
+- `assignedManagerId`: nullable snapshot manager tai submit
+- `title`: required, max 120
+- `description`: optional, max 1000
+- `amountVnd`: positive integer
+- `category`: `TRAVEL`, `MEAL`, `OFFICE`, `TRAINING`, `OTHER`
+- `expenseDate`: date-only, khong tuong lai
+- `status`: `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`
+- `submittedAt`: nullable
+- `createdAt`, `updatedAt`: UTC
+
+Khi submit, `assignedManagerId` lay manager hien tai cua employee. Thay doi `User.managerId` khong lam thay doi expense `PENDING`. Reopen tu `REJECTED` xoa assigned manager; submit lai tao snapshot moi.
+
+### RefreshSession
+
+- `id`
+- `userId`
+- refresh-token hash
+- CSRF-token hash hien tai
+- expiry, created timestamp, last-used timestamp
+- revoked timestamp/reason
+- optional device/session metadata khong nhay cam
+
+Moi login tao mot session. Mot user co the co nhieu session/device. Rotation thay hash cu bang hash moi. Logout revoke session hien tai. Session service co internal capability `revokeAllSessionsForUser`; password change, forgot/reset va logout-all khong co API/UI trong MVP.
+
+### AuditEvent
+
+- `id`
+- `expenseId`
+- `eventType`
+- `actorId`
+- `fromStatus`, `toStatus`
+- `reason` nullable
+- `createdAt` UTC
+
+Audit append-only, khong co API update/delete va luu vo thoi han trong MVP. Metadata noi bo khong duoc tra qua audit API va khong duoc chua password, token, token hash hoac secret.
+
+Indexes can thiet cho owner/status/date, assigned manager/status/date, session user/revocation/expiry va audit expense/time.
+
+## 6. State machine va transaction
+
+| Transition            | Authorization                      | Transaction effect                                         |
+| --------------------- | ---------------------------------- | ---------------------------------------------------------- |
+| `DRAFT -> PENDING`    | Owner Employee co manager hien tai | Gan assigned manager snapshot, set submittedAt, tao audit. |
+| `PENDING -> APPROVED` | Assigned Manager                   | Update status, tao audit.                                  |
+| `PENDING -> REJECTED` | Assigned Manager, reason bat buoc  | Update status, tao audit voi reason.                       |
+| `REJECTED -> DRAFT`   | Owner Employee                     | Xoa assigned manager, tao audit.                           |
+
+`APPROVED` terminal. Update phai co dieu kien status hien tai trong transaction; neu khong con match hoac co concurrent transition thi tra `409`. Khong dung general idempotency key trong MVP.
+
+## 7. Authentication, cookie, CORS va CSRF
+
+### Token
+
+- Access token TTL 15 phut, chi giu trong frontend memory.
+- Khong luu access token trong localStorage.
+- Refresh token chi o HttpOnly cookie.
+- Database chi luu hash refresh token.
+- Login tao RefreshSession va tra access token cung CSRF token dau tien.
+- Refresh rotation ca refresh token va CSRF token.
+- Logout revoke session hien tai.
+
+### Cookie va origin
+
+Production refresh cookie:
+
+- `HttpOnly=true`
+- `Secure=true`
+- `SameSite=Lax`
+- host-only, khong set Domain
+- `Path=/api/v1/auth`
+- expiry phu hop voi refresh session
+
+CORS chi cho configured frontend origins, `credentials=true`, khong dung wildcard origin. Refresh/logout phai kiem tra Origin hop le va CSRF header. Production dung HTTPS.
+
+### CSRF flow
+
+1. `GET /api/v1/auth/csrf` doc refresh-token cookie de tim RefreshSession.
+2. Backend tao raw CSRF token ngau nhien, luu hash vao session va tra raw token trong JSON.
+3. Response co `Cache-Control: no-store`.
+4. Frontend giu CSRF token trong memory.
+5. Refresh/logout gui refresh cookie, `Origin` hop le va `X-CSRF-Token`.
+6. Refresh thanh cong rotate ca refresh token va CSRF token.
+7. Access-token business APIs dung `Authorization: Bearer`.
+
+Full reload lam mat access/CSRF token memory; frontend khoi tao lai bang cookie-based auth flow, khong hydrate tu storage. Khong tra token/hash/secret trong response khong can thiet.
+
+Login kiem tra Origin va rate limit. Secret va credentials chi nam trong environment/configured secret store.
+
+## 8. Seed va password
+
+- Password policy: 12-128 ky tu.
+- Hash Argon2id.
+- Khong bat buoc chu hoa, so hoac ky tu dac biet.
+- Demo credentials lay tu environment variables.
+- Khong commit credential that.
+- Seed idempotent, chi chay khi duoc goi ro rang.
+- Demo seed khong tu chay trong production.
+- Local, CI va production dung credentials rieng.
+
+## 9. Migration va database environments
+
+Local co hai database:
+
+- `expense_flow_dev`
+- `expense_flow_test`
+
+Integration test chi dung `TEST_DATABASE_URL`, apply migrations va reset test data co kiem soat. Migration tao/review trong development va commit vao repository. Test va production dung `prisma migrate deploy`; production khong dung `prisma migrate dev`. API startup khong chay migration.
+
+Paid Render service dung pre-deploy command:
+
+```text
+pnpm --filter @expense-flow/api db:migrate:deploy
+```
+
+Free portfolio deployment dung GitHub Actions chay migration dung mot lan sau test/build va truoc khi trigger Render deploy. `PRODUCTION_DATABASE_URL` nam trong GitHub environment secret. Migration job co concurrency control. Neu migration that bai, deployment dung lai va khong trigger Render deploy. Demo seed la thao tac rieng, khong chay cung migration.
+
+## 10. Testing strategy
+
+- Foundation: typecheck, lint, sample unit test va health integration test.
+- Unit tests dung Vitest, khong can database: policy, validation, money/date rules, state machine va token/session helpers.
+- Integration tests dung Vitest voi Express/Prisma va `TEST_DATABASE_URL`.
+- Moi vertical feature them unit/integration test tuong ung.
+- Playwright chi them sau khi flow chinh hoan thanh; bao phu login, draft lifecycle, submit, approve/reject, mandatory reason, reopen, audit, filters va dashboard.
+- CI day du chay sau flow chinh; GitHub Actions dung PostgreSQL service container tren Linux runner.
+
+## 11. Vertical delivery order
+
+1. pnpm workspace, runtime constraints, shared contracts, typecheck/lint/sample tests.
+2. Prisma schema, migration, seed explicit va health integration test.
+3. Authentication, RefreshSession, CSRF va logout session hien tai.
+4. Employee draft lifecycle.
+5. Submit, employee-without-manager rules va assigned manager snapshot.
+6. Manager approve/reject, conflict handling va audit visibility.
+7. List/filter/pagination.
+8. Current-month dashboard.
+9. Frontend validation, error states va accessibility hardening.
+10. Playwright E2E va CI day du.
+
+Chi tiet implementation khong anh huong contract duoc chot trong vertical tuong ung.
+
+## 12. Architecture status
+
+Plan da duoc chot va san sang cho documentation/implementation. Khong co API password change, forgot/reset password, logout-all UI/API hoac user-management UI/API trong MVP.
