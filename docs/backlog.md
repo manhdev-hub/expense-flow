@@ -108,7 +108,7 @@
 - Automated tests: Health integration test.
 - Manual acceptance check: Goi endpoint khi API chay.
 - Deliverable/evidence: Route, test va response.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-010 - Docker Compose va environment hygiene
 
