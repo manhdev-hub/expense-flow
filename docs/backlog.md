@@ -178,7 +178,7 @@
 - Automated tests: Seed mapping, password validation va idempotency tests.
 - Manual acceptance check: Goi seed hai lan va kiem tra khong duplicate.
 - Deliverable/evidence: Seed source, safe env example va output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ## Epic 4: Authentication va Session
 
