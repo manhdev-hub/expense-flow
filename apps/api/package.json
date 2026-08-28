@@ -9,10 +9,16 @@
     "start": "node dist/server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:validate": "prisma validate",
+    "db:generate": "prisma generate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@expense-flow/shared": "workspace:*",
+    "@prisma/client": "^6.19.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^5.0.1",
@@ -27,6 +33,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.4",
     "@types/supertest": "^6.0.2",
+    "prisma": "6.19.3",
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.8.2",

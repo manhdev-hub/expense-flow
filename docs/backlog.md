@@ -143,7 +143,7 @@
 - Automated tests: Workflow run.
 - Manual acceptance check: Review ordering va result.
 - Deliverable/evidence: Green Early CI run.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ## Epic 3: Database va Seed
 
@@ -156,7 +156,7 @@
 - Automated tests: Prisma validation va DB connection integration test.
 - Manual acceptance check: Review schema va access boundary.
 - Deliverable/evidence: Prisma schema/generated client config.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-014 - Development/test migration workflow
 

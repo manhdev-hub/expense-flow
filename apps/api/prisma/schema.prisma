@@ -1,0 +1,123 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  MEAL
+  OFFICE
+  TRAINING
+  OTHER
+}
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AuditEventType {
+  CREATED
+  UPDATED
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REOPENED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(EMPLOYEE)
+  managerId    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  manager      User?    @relation("ManagerSubordinates", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates User[]   @relation("ManagerSubordinates")
+
+  expenses         Expense[]        @relation("ExpenseOwner")
+  assignedExpenses Expense[]        @relation("ExpenseAssignedManager")
+  refreshSessions  RefreshSession[]
+  auditEvents      AuditEvent[]
+
+  @@map("users")
+}
+
+model Expense {
+  id                String          @id @default(uuid())
+  ownerId           String
+  assignedManagerId String?
+  title             String          @db.VarChar(120)
+  description       String?         @db.VarChar(1000)
+  amountVnd         Int
+  category          ExpenseCategory
+  expenseDate       DateTime        @db.Date
+  status            ExpenseStatus   @default(DRAFT)
+  submittedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  owner           User         @relation("ExpenseOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  assignedManager User?        @relation("ExpenseAssignedManager", fields: [assignedManagerId], references: [id], onDelete: SetNull)
+  auditEvents     AuditEvent[]
+
+  @@index([ownerId, status, expenseDate])
+  @@index([assignedManagerId, status, expenseDate])
+  @@index([status, assignedManagerId])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+model RefreshSession {
+  id               String    @id @default(uuid())
+  userId           String
+  refreshTokenHash String    @unique
+  csrfTokenHash    String
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  revokedAt        DateTime?
+  revokedReason    String?
+  userAgent        String?
+  ipAddress        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([refreshTokenHash])
+  @@map("refresh_sessions")
+}
+
+model AuditEvent {
+  id         String         @id @default(uuid())
+  expenseId  String
+  eventType  AuditEventType
+  actorId    String
+  fromStatus ExpenseStatus?
+  toStatus   ExpenseStatus
+  reason     String?        @db.VarChar(1000)
+  createdAt  DateTime       @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  actor   User    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([expenseId, createdAt])
+  @@index([actorId])
+  @@map("audit_events")
+}
+
