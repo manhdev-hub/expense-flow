@@ -97,7 +97,7 @@
 - Automated tests: Unit/integration tests request ID, 404, validation va error contract.
 - Manual acceptance check: Goi route khong ton tai va request sai.
 - Deliverable/evidence: Middleware va sample responses.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-009 - Health endpoint va integration test
 
