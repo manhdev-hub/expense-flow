@@ -156,7 +156,7 @@
 - Automated tests: Prisma validation va DB connection integration test.
 - Manual acceptance check: Review schema va access boundary.
 - Deliverable/evidence: Prisma schema/generated client config.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-014 - Development/test migration workflow
 
