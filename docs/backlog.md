@@ -130,7 +130,7 @@
 - Automated tests: Foundation command suite.
 - Manual acceptance check: Mo placeholder va goi health.
 - Deliverable/evidence: Checklist output va clean Git status.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ## Epic 2: Early CI
 

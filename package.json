@@ -7,10 +7,12 @@
     "pnpm": ">=11 <12"
   },
   "scripts": {
+    "dev": "pnpm --parallel dev",
     "dev:web": "pnpm --filter @expense-flow/web dev",
     "dev:api": "pnpm --filter @expense-flow/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "lint": "pnpm -r --if-present lint"
   }
 }
