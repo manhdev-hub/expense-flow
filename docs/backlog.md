@@ -119,7 +119,7 @@
 - Automated tests: Compose startup va tracked-file hygiene checks.
 - Manual acceptance check: Kiem tra database start va Git status.
 - Deliverable/evidence: Compose/env/gitignore files.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-011 - Foundation verification
 

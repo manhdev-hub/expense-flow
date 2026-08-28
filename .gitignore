@@ -1,7 +1,43 @@
-node_modules
-.next
-dist
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production / Build outputs
+dist/
+.next/
+out/
+build/
 *.tsbuildinfo
+
+# Environment & Secrets
 .env
-.env*.local
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+
+# OS & IDE
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
