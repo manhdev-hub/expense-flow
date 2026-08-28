@@ -17,11 +17,12 @@ describe('Early CI workflow verification', () => {
 
     // Runtime setup
     expect(content).toContain('version: 11.20.0');
-    expect(content).toContain("node-version-file: '.nvmrc'");
-    expect(content).toContain("cache: 'pnpm'");
+    expect(content).toMatch(/node-version-file:\s*['"]?\.nvmrc['"]?/);
+    expect(content).toMatch(/cache:\s*['"]?pnpm['"]?/);
 
     // Essential foundation steps
     expect(content).toContain('pnpm install --frozen-lockfile');
+    expect(content).toContain('pnpm --filter @expense-flow/shared build');
     expect(content).toContain('pnpm lint');
     expect(content).toContain('pnpm typecheck');
     expect(content).toContain('pnpm test');
@@ -32,4 +33,3 @@ describe('Early CI workflow verification', () => {
     expect(content).not.toContain('services:');
   });
 });
-
