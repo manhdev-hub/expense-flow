@@ -7,6 +7,14 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .optional(),
+  DATABASE_URL: z
+    .string()
+    .min(1)
+    .default('postgresql://postgres:postgres@localhost:5432/expense_flow_dev?schema=public'),
+  TEST_DATABASE_URL: z
+    .string()
+    .min(1)
+    .default('postgresql://postgres:postgres@localhost:5432/expense_flow_test?schema=public'),
 });
 
 export type RawEnv = z.input<typeof envSchema>;

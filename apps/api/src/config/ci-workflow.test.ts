@@ -23,6 +23,7 @@ describe('Early CI workflow verification', () => {
     // Essential foundation steps
     expect(content).toContain('pnpm install --frozen-lockfile');
     expect(content).toContain('pnpm --filter @expense-flow/shared build');
+    expect(content).toContain('pnpm --filter @expense-flow/api db:generate');
     expect(content).toContain('pnpm lint');
     expect(content).toContain('pnpm typecheck');
     expect(content).toContain('pnpm test');

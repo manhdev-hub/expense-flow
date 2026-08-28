@@ -11,8 +11,8 @@
     "dev:web": "pnpm --filter @expense-flow/web dev",
     "dev:api": "pnpm --filter @expense-flow/api dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm --filter @expense-flow/shared build && pnpm -r typecheck",
+    "typecheck": "pnpm --filter @expense-flow/shared build && pnpm --filter @expense-flow/api db:generate && pnpm -r typecheck",
     "test": "pnpm -r test",
-    "lint": "pnpm --filter @expense-flow/shared build && pnpm -r --if-present lint"
+    "lint": "pnpm --filter @expense-flow/shared build && pnpm --filter @expense-flow/api db:generate && pnpm -r --if-present lint"
   }
 }

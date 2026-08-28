@@ -143,7 +143,7 @@
 - Automated tests: Workflow run.
 - Manual acceptance check: Review ordering va result.
 - Deliverable/evidence: Green Early CI run.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ## Epic 3: Database va Seed
 
