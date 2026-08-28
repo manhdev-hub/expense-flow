@@ -86,7 +86,7 @@
 - Automated tests: Config valid/invalid va logging redaction tests.
 - Manual acceptance check: Review log mau khong co secret.
 - Deliverable/evidence: Config/logger source va output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-008 - API error foundation
 

@@ -57,5 +57,17 @@ describe('Express application foundation', () => {
     expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3000');
     expect(response.headers['access-control-allow-credentials']).toBe('true');
   });
+
+  it('attaches logger to request context via httpLogger middleware', async () => {
+    app.get('/test/http-logger', (req, res) => {
+      expect(req.log).toBeDefined();
+      expect(typeof req.log.info).toBe('function');
+      res.status(200).json({ loggerAttached: true });
+    });
+
+    const response = await request(app).get('/test/http-logger');
+    expect(response.status).toBe(200);
+    expect(response.body.loggerAttached).toBe(true);
+  });
 });
 

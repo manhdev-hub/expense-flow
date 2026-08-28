@@ -15,7 +15,10 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^5.0.1",
-    "helmet": "^8.0.0"
+    "helmet": "^8.0.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.8",
@@ -29,4 +32,3 @@
     "vitest": "^3.0.0"
   }
 }
-

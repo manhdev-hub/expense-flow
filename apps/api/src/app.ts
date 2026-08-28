@@ -2,17 +2,21 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
+import { env } from './config/env.js';
+import { httpLogger } from './middleware/http-logger.js';
 
 const app: Express = express();
+
+// HTTP request logger
+app.use(httpLogger);
 
 // Security HTTP headers
 app.use(helmet());
 
 // CORS configuration (environment-based allowed origin, credentials allowed)
-const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: env.CLIENT_ORIGIN,
     credentials: true,
   })
 );
@@ -25,4 +29,5 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
 export { app };
+
 
