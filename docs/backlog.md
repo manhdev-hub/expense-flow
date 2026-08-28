@@ -167,7 +167,7 @@
 - Automated tests: Apply migration tren `TEST_DATABASE_URL` va verify schema.
 - Manual acceptance check: Review migration diff va startup command.
 - Deliverable/evidence: Migration files va test DB output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-015 - Idempotent demo seed
 
