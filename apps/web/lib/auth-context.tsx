@@ -9,6 +9,9 @@ export interface AuthContextType {
   csrfToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  fetchCsrfToken: () => Promise<string | null>;
+  refreshAuth: () => Promise<void>;
+  logout: () => Promise<void>;
   logoutClient: () => void;
 }
 
@@ -46,6 +49,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCsrfToken(json.data.csrfToken);
   };
 
+  const fetchCsrfToken = async (): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const newCsrf = json?.data?.csrfToken || null;
+      if (newCsrf) setCsrfToken(newCsrf);
+      return newCsrf;
+    } catch {
+      return null;
+    }
+  };
+
+  const refreshAuth = async (): Promise<void> => {
+    let tokenToUse = csrfToken;
+    if (!tokenToUse) {
+      tokenToUse = await fetchCsrfToken();
+    }
+
+    if (!tokenToUse) {
+      logoutClient();
+      throw new Error('CSRF token could not be obtained');
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-Token': tokenToUse,
+      },
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      logoutClient();
+      throw new Error('Session refresh failed');
+    }
+
+    const json = await res.json();
+    setAccessToken(json.data.accessToken);
+    setCsrfToken(json.data.csrfToken);
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      if (csrfToken) {
+        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+          credentials: 'include',
+        });
+      }
+    } finally {
+      logoutClient();
+    }
+  };
+
   const logoutClient = () => {
     setUser(null);
     setAccessToken(null);
@@ -60,6 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         csrfToken,
         isAuthenticated: !!user && !!accessToken,
         login,
+        fetchCsrfToken,
+        refreshAuth,
+        logout,
         logoutClient,
       }}
     >
@@ -75,4 +142,3 @@ export function useAuth(): AuthContextType {
   }
   return context;
 }
-

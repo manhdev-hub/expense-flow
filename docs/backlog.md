@@ -213,7 +213,7 @@
 - Automated tests: CSRF/Origin/CORS/cookie/rotation tests.
 - Manual acceptance check: Valid flow thanh cong, thieu CSRF/Origin bi chan.
 - Deliverable/evidence: Security config, auth client, tests va network evidence.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ## Epic 5: Employee Draft va Submit
 

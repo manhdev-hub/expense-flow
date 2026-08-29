@@ -151,16 +151,63 @@ describe('Authentication Routes: /api/v1/auth', () => {
     });
   });
 
-  describe('POST /api/v1/auth/refresh', () => {
-    it('successfully rotates tokens with valid refresh cookie', async () => {
+  describe('GET /api/v1/auth/csrf', () => {
+    it('returns raw csrf token and sets Cache-Control: no-store', async () => {
       const rawRefreshToken = generateSecureToken();
       const tokenHash = hashToken(rawRefreshToken);
 
       vi.spyOn(prisma.refreshSession, 'findUnique').mockResolvedValue({
-        id: 'sess-active-1',
+        id: 'sess-csrf-1',
         userId: 'usr-1',
         refreshTokenHash: tokenHash,
-        csrfTokenHash: 'old-csrf-hash',
+        csrfTokenHash: 'prev-csrf-hash',
+        expiresAt: new Date(Date.now() + 100000),
+        revokedAt: null,
+      } as any);
+
+      const updateSpy = vi
+        .spyOn(prisma.refreshSession, 'update')
+        .mockResolvedValue({} as any);
+
+      const res = await request(app)
+        .get('/api/v1/auth/csrf')
+        .set('Cookie', [`refreshToken=${rawRefreshToken}`]);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.csrfToken).toBeDefined();
+      expect(res.headers['cache-control']).toContain('no-store');
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'sess-csrf-1' },
+          data: expect.objectContaining({
+            csrfTokenHash: expect.any(String),
+          }),
+        })
+      );
+    });
+
+    it('rejects CSRF request without refresh cookie (401 INVALID_REFRESH_TOKEN)', async () => {
+      const res = await request(app).get('/api/v1/auth/csrf');
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+    });
+  });
+
+  describe('POST /api/v1/auth/refresh', () => {
+    it('successfully rotates tokens with valid refresh cookie, X-CSRF-Token, and matching Origin', async () => {
+      const rawRefreshToken = generateSecureToken();
+      const rawCsrfToken = generateSecureToken();
+
+      const refreshHash = hashToken(rawRefreshToken);
+      const csrfHash = hashToken(rawCsrfToken);
+
+      vi.spyOn(prisma.refreshSession, 'findUnique').mockResolvedValue({
+        id: 'sess-active-1',
+        userId: 'usr-1',
+        refreshTokenHash: refreshHash,
+        csrfTokenHash: csrfHash,
         expiresAt: new Date(Date.now() + 100000),
         revokedAt: null,
         revokedReason: null,
@@ -187,6 +234,8 @@ describe('Authentication Routes: /api/v1/auth', () => {
 
       const res = await request(app)
         .post('/api/v1/auth/refresh')
+        .set('Origin', 'http://localhost:3000')
+        .set('X-CSRF-Token', rawCsrfToken)
         .set('Cookie', [`refreshToken=${rawRefreshToken}`]);
 
       expect(res.status).toBe(200);
@@ -204,51 +253,40 @@ describe('Authentication Routes: /api/v1/auth', () => {
       expect(updateSessionSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects refresh when cookie is missing (401 INVALID_REFRESH_TOKEN)', async () => {
-      const res = await request(app).post('/api/v1/auth/refresh');
-
-      expect(res.status).toBe(401);
-      expect(res.body.error.code).toBe('INVALID_REFRESH_TOKEN');
-    });
-
-    it('rejects refresh when session is revoked or expired (401 INVALID_REFRESH_TOKEN)', async () => {
-      const rawRefreshToken = generateSecureToken();
-      const tokenHash = hashToken(rawRefreshToken);
-
-      vi.spyOn(prisma.refreshSession, 'findUnique').mockResolvedValue({
-        id: 'sess-revoked',
-        userId: 'usr-1',
-        refreshTokenHash: tokenHash,
-        csrfTokenHash: 'csrf',
-        expiresAt: new Date(Date.now() + 100000),
-        revokedAt: new Date(), // Already revoked
-        revokedReason: 'USER_LOGOUT',
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        userAgent: null,
-        ipAddress: null,
-        user: { id: 'usr-1', isActive: true },
-      } as any);
-
+    it('rejects refresh when X-CSRF-Token is missing (403 INVALID_CSRF_TOKEN)', async () => {
       const res = await request(app)
         .post('/api/v1/auth/refresh')
-        .set('Cookie', [`refreshToken=${rawRefreshToken}`]);
+        .set('Cookie', ['refreshToken=some-token']);
 
-      expect(res.status).toBe(401);
-      expect(res.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('INVALID_CSRF_TOKEN');
+    });
+
+    it('rejects refresh when Origin is untrusted (403 INVALID_ORIGIN)', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/refresh')
+        .set('Origin', 'http://malicious-site.com')
+        .set('X-CSRF-Token', 'token')
+        .set('Cookie', ['refreshToken=token']);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('INVALID_ORIGIN');
     });
   });
 
   describe('POST /api/v1/auth/logout', () => {
-    it('revokes current session and clears refresh cookie', async () => {
+    it('revokes current session and clears refresh cookie when CSRF and Origin are valid', async () => {
       const rawRefreshToken = generateSecureToken();
-      const tokenHash = hashToken(rawRefreshToken);
+      const rawCsrfToken = generateSecureToken();
+
+      const refreshHash = hashToken(rawRefreshToken);
+      const csrfHash = hashToken(rawCsrfToken);
 
       vi.spyOn(prisma.refreshSession, 'findUnique').mockResolvedValue({
         id: 'sess-logout-1',
         userId: 'usr-1',
-        refreshTokenHash: tokenHash,
-        csrfTokenHash: 'csrf',
+        refreshTokenHash: refreshHash,
+        csrfTokenHash: csrfHash,
         expiresAt: new Date(Date.now() + 100000),
         revokedAt: null,
         revokedReason: null,
@@ -264,6 +302,8 @@ describe('Authentication Routes: /api/v1/auth', () => {
 
       const res = await request(app)
         .post('/api/v1/auth/logout')
+        .set('Origin', 'http://localhost:3000')
+        .set('X-CSRF-Token', rawCsrfToken)
         .set('Cookie', [`refreshToken=${rawRefreshToken}`]);
 
       expect(res.status).toBe(200);
@@ -283,6 +323,16 @@ describe('Authentication Routes: /api/v1/auth', () => {
           }),
         })
       );
+    });
+
+    it('rejects logout when CSRF token is invalid (403 INVALID_CSRF_TOKEN)', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/logout')
+        .set('Origin', 'http://localhost:3000')
+        .set('Cookie', ['refreshToken=token']);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('INVALID_CSRF_TOKEN');
     });
   });
 

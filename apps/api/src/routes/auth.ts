@@ -4,7 +4,9 @@ import { rateLimit } from 'express-rate-limit';
 import { env } from '../config/env.js';
 import { UnauthorizedError, ValidationError } from '../errors/app-error.js';
 import { requireAuth } from '../middleware/auth-middleware.js';
+import { requireCsrf, validateOrigin } from '../middleware/security.js';
 import {
+  generateCsrfTokenForSession,
   getCurrentUser,
   loginUser,
   logoutSession,
@@ -38,78 +40,108 @@ const loginLimiter = rateLimit({
   },
 });
 
-authRouter.post('/login', loginLimiter, async (req: Request, res: Response) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const fields: Record<string, string[]> = {};
-    for (const issue of parsed.error.issues) {
-      const fieldPath = issue.path.join('.') || '_root';
-      if (!fields[fieldPath]) {
-        fields[fieldPath] = [];
+authRouter.post(
+  '/login',
+  validateOrigin,
+  loginLimiter,
+  async (req: Request, res: Response) => {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const fields: Record<string, string[]> = {};
+      for (const issue of parsed.error.issues) {
+        const fieldPath = issue.path.join('.') || '_root';
+        if (!fields[fieldPath]) {
+          fields[fieldPath] = [];
+        }
+        fields[fieldPath].push(issue.message);
       }
-      fields[fieldPath].push(issue.message);
+      throw new ValidationError('Invalid login request parameters', { fields });
     }
-    throw new ValidationError('Invalid login request parameters', { fields });
+
+    const { email, password } = parsed.data;
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    const result = await loginUser(email, password, { ipAddress, userAgent });
+
+    // Set HttpOnly refresh token cookie
+    res.cookie('refreshToken', result.rawRefreshToken, getRefreshCookieOptions());
+
+    // Return access token, CSRF token, and user info (without refresh token in body)
+    return res.status(200).json({
+      data: {
+        accessToken: result.accessToken,
+        expiresInSeconds: result.expiresInSeconds,
+        csrfToken: result.csrfToken,
+        user: result.user,
+      },
+    });
   }
+);
 
-  const { email, password } = parsed.data;
-  const ipAddress = req.ip || req.socket.remoteAddress;
-  const userAgent = req.headers['user-agent'];
-
-  const result = await loginUser(email, password, { ipAddress, userAgent });
-
-  // Set HttpOnly refresh token cookie
-  res.cookie('refreshToken', result.rawRefreshToken, getRefreshCookieOptions());
-
-  // Return access token, CSRF token, and user info (without refresh token in body)
-  return res.status(200).json({
-    data: {
-      accessToken: result.accessToken,
-      expiresInSeconds: result.expiresInSeconds,
-      csrfToken: result.csrfToken,
-      user: result.user,
-    },
-  });
-});
-
-authRouter.post('/refresh', async (req: Request, res: Response) => {
+authRouter.get('/csrf', async (req: Request, res: Response) => {
   const rawRefreshToken = req.cookies?.refreshToken;
   if (!rawRefreshToken) {
     throw new UnauthorizedError('Refresh token cookie is missing', 'INVALID_REFRESH_TOKEN');
   }
 
-  const ipAddress = req.ip || req.socket.remoteAddress;
-  const userAgent = req.headers['user-agent'];
+  const csrfToken = await generateCsrfTokenForSession(rawRefreshToken);
 
-  const result = await refreshSession(rawRefreshToken, { ipAddress, userAgent });
-
-  // Set new rotated HttpOnly refresh token cookie
-  res.cookie('refreshToken', result.rawRefreshToken, getRefreshCookieOptions());
+  // Must have Cache-Control: no-store
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
 
   return res.status(200).json({
     data: {
-      accessToken: result.accessToken,
-      expiresInSeconds: result.expiresInSeconds,
-      csrfToken: result.csrfToken,
+      csrfToken,
     },
   });
 });
 
-authRouter.post('/logout', async (req: Request, res: Response) => {
-  const rawRefreshToken = req.cookies?.refreshToken;
-  if (rawRefreshToken) {
-    await logoutSession(rawRefreshToken);
+authRouter.post(
+  '/refresh',
+  validateOrigin,
+  requireCsrf,
+  async (req: Request, res: Response) => {
+    const rawRefreshToken = req.cookies?.refreshToken;
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    const result = await refreshSession(rawRefreshToken, { ipAddress, userAgent });
+
+    // Set new rotated HttpOnly refresh token cookie
+    res.cookie('refreshToken', result.rawRefreshToken, getRefreshCookieOptions());
+
+    return res.status(200).json({
+      data: {
+        accessToken: result.accessToken,
+        expiresInSeconds: result.expiresInSeconds,
+        csrfToken: result.csrfToken,
+      },
+    });
   }
+);
 
-  // Clear refresh token cookie on client
-  res.clearCookie('refreshToken', getRefreshCookieOptions());
+authRouter.post(
+  '/logout',
+  validateOrigin,
+  requireCsrf,
+  async (req: Request, res: Response) => {
+    const rawRefreshToken = req.cookies?.refreshToken;
+    if (rawRefreshToken) {
+      await logoutSession(rawRefreshToken);
+    }
 
-  return res.status(200).json({
-    data: {
-      message: 'Logged out successfully',
-    },
-  });
-});
+    // Clear refresh token cookie on client
+    res.clearCookie('refreshToken', getRefreshCookieOptions());
+
+    return res.status(200).json({
+      data: {
+        message: 'Logged out successfully',
+      },
+    });
+  }
+);
 
 authRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
   const user = await getCurrentUser(req.user!.id);

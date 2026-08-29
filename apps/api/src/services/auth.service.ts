@@ -106,6 +106,39 @@ export async function loginUser(
   };
 }
 
+export async function generateCsrfTokenForSession(
+  rawRefreshToken: string
+): Promise<string> {
+  if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+    throw new UnauthorizedError('Refresh token is required', 'INVALID_REFRESH_TOKEN');
+  }
+
+  const refreshTokenHash = hashToken(rawRefreshToken);
+
+  const session = await prisma.refreshSession.findUnique({
+    where: { refreshTokenHash },
+  });
+
+  if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+    throw new UnauthorizedError(
+      'Invalid, expired, or revoked refresh session',
+      'INVALID_REFRESH_TOKEN'
+    );
+  }
+
+  const newRawCsrfToken = generateSecureToken();
+  const newCsrfTokenHash = hashToken(newRawCsrfToken);
+
+  await prisma.refreshSession.update({
+    where: { id: session.id },
+    data: {
+      csrfTokenHash: newCsrfTokenHash,
+    },
+  });
+
+  return newRawCsrfToken;
+}
+
 export async function refreshSession(
   rawRefreshToken: string,
   options: SessionOptions = {}
