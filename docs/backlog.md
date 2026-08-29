@@ -191,7 +191,7 @@
 - Automated tests: Auth unit va login integration tests.
 - Manual acceptance check: Login va kiem tra browser storage khong co token.
 - Deliverable/evidence: Auth API/UI, tests va browser evidence.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-017 - Refresh sessions va logout
 
