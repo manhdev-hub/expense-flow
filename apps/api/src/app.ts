@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { httpLogger } from './middleware/http-logger.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
+import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 
 const app: Express = express();
@@ -37,6 +38,7 @@ app.use(cookieParser());
 
 // API v1 routes
 app.use('/api/v1/health', healthRouter);
+app.use('/api/v1/auth', authRouter);
 
 // Fallback 404 handler for unmatched routes
 app.use(notFoundHandler);

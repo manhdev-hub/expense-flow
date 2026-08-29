@@ -30,14 +30,22 @@ export class BadRequestError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized', details?: ErrorDetails) {
-    super(401, 'UNAUTHORIZED', message, details);
+  constructor(
+    message = 'Unauthorized',
+    code = 'UNAUTHORIZED',
+    details?: ErrorDetails
+  ) {
+    super(401, code, message, details);
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = 'Forbidden', details?: ErrorDetails) {
-    super(403, 'FORBIDDEN', message, details);
+  constructor(
+    message = 'Forbidden',
+    code = 'FORBIDDEN',
+    details?: ErrorDetails
+  ) {
+    super(403, code, message, details);
   }
 }
 

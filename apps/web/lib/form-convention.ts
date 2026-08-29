@@ -12,7 +12,7 @@ export function useZodForm<TSchema extends z.ZodTypeAny, TContext = any>(
 ): UseFormReturn<z.infer<TSchema>, TContext> {
   return useForm<z.infer<TSchema>, TContext>({
     ...options,
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema as any),
   });
 }
 

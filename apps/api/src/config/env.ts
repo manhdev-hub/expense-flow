@@ -15,6 +15,12 @@ const envSchema = z.object({
     .string()
     .min(1)
     .default('postgresql://postgres:postgres@localhost:5432/expense_flow_test?schema=public'),
+  JWT_SECRET: z
+    .string()
+    .min(32, 'JWT_SECRET must be at least 32 characters')
+    .default('super-secret-jwt-key-for-development-32-chars-minimum!'),
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900), // 15 minutes
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7), // 7 days
 });
 
 export type RawEnv = z.input<typeof envSchema>;
