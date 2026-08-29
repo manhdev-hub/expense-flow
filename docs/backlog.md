@@ -202,7 +202,7 @@
 - Automated tests: Rotation, multiple session, revoke va me integration tests.
 - Manual acceptance check: Logout session nay khong lam mat session khac.
 - Deliverable/evidence: Session service/endpoints va test output.
-- Trang thai: `TODO`
+- Trang thai: `DONE`
 
 ### EF-018 - CSRF va cookie/CORS end-to-end
 
